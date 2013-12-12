@@ -206,9 +206,53 @@ public:
                 t = false;
             }
         }
-
         return t;
     };
+
+    static bool cmpTree2(BinaryTree* lhs, BinaryTree* rhs){
+        bool t;
+        // スコアが小さいほうが先
+        if(lhs->score < rhs->score){
+            t = true;
+        }
+        else{
+            // スコアが等しいとき
+            if(lhs->score == rhs->score){
+                if(lhs->score == 0 && rhs->score==0){
+                    if(lhs->countNode() < rhs->countNode()){
+                        t = true;
+                    }
+                    else{
+                        t = false;
+                    }
+                }
+                else{
+                    if(lhs->countNode() < rhs->countNode()){
+                        t = true;
+                    }
+                    else{
+                        if(lhs->countNode() == rhs->countNode()){
+                            if(lhs->traverse() > rhs->traverse()){
+                                t = true;
+                            }
+                            else{
+                                t = false;
+                            }
+                        }
+                        else{
+                            t = false;
+                        }
+                    }
+                }
+            }
+            // スコアが大きい
+            else{
+                t = false;
+            }
+        }
+        return t;
+    };
+
     int countNode(){ return (int)tree.size(); };
     void generateTree(int idx);
     map<int, Symbol*>& getTree(){return tree;};
@@ -426,7 +470,8 @@ public:
                vector<Symbol*>& gpFunctions,
                vector<Symbol*>& gpTerminals,
                Symbol* gpAnswer);
-    void preserveElite();
+    void preserveElite(map<string, BinaryTree*>& repo, int flag);
+    // void preserveElite();
     void selection();
     void mutation();
     void i_pop_back(){individual.pop_back();};
@@ -459,7 +504,7 @@ Population::Population(int btnum, int elnum, int in_maxDepth,
     }
 }
 
-void Population::preserveElite(){
+void Population::preserveElite(map<string, BinaryTree*>& repo, int flag){
     vector<BinaryTree*> p;
     map<string, BinaryTree*> m;
     int elnum, pnum, j,k;
@@ -479,16 +524,23 @@ void Population::preserveElite(){
     cout << "  == cs preserveElite ==" << endl;
     cout << "psize : " << p.size() << endl;
     */
-    sort(p.begin(), p.end(), BinaryTree::cmpTree);
+    if(flag == 0){
+        sort(p.begin(), p.end(), BinaryTree::cmpTree);
+    }
+    else{
+        sort(p.begin(), p.end(), BinaryTree::cmpTree2);
+    }
     //sort(individual.begin(), individual.end(), BinaryTree::cmpTree);
     elnum = (int)elite.size();
     m.clear();
     j=0;
     for(int i=0;i<(int)individual.size();i++){
         if(j < elnum){
-            if(m.find(p[i]->traverse()) == m.end()){
+            if((m.find(p[i]->traverse()) == m.end())
+                && repo.find(p[i]->traverse()) == repo.end()){
                 elite[j] = p[i]->clone();
                 m.insert(make_pair(p[i]->traverse(), p[i]));
+                repo.insert(make_pair(p[i]->traverse(), p[i]));
                 j++;
             }
         }
@@ -640,29 +692,28 @@ int main(int argc, char** argv){
     vector<Symbol*> gpTerminals;
     Symbol* gpAnswer;
 
-	int cycleLimit    = 3000;
-    int numPopulation = 16;
-    int numIndividual = 3200 / numPopulation;
+	int cycleLimit    = 5000;
+    int numPopulation = 8;
+    int numIndividual = 1280 / numPopulation;
     int numElite      = 2;
-    int maxDepth      = 10;
+    int maxDepth      = 12;
     int numMigration  = 1;
-    int dispInterval   = 1;
-    int migrateInterval = 10;
+    int dispInterval   = 5;
+    int migrateInterval = 20;
     vector<Population*> p;
+    map<string, BinaryTree*> m;
 
     srand((UINT32)time(NULL));
 
-	gpFunctions.resize(6);
+	gpFunctions.resize(8);
     gpFunctions[GP_AND] = new Symbol("and", gp_and, 2);
     gpFunctions[GP_ADD] = new Symbol("add", gp_add, 2);
     gpFunctions[GP_OR]  = new Symbol("or",  gp_or,  2);
     gpFunctions[GP_SUB] = new Symbol("sub", gp_sub, 2);
     gpFunctions[GP_XOR] = new Symbol("xor", gp_xor, 2);
     gpFunctions[GP_NOT] = new Symbol("not", gp_not, 1);
-    /*
     gpFunctions[GP_SR1] = new Symbol("sr1", gp_sr1, 1);
     gpFunctions[GP_SL1] = new Symbol("sl1", gp_sl1, 1);
-    */
 
     ifs.open(argv[1]);
     while(ifs && getline(ifs, buf)){
@@ -730,16 +781,18 @@ int main(int argc, char** argv){
         cout << " ==== Begin Presevation ====" << endl;
         #endif
         
-        #pragma omp parallel for
+        m.clear();
+        // #pragma omp parallel for shared(m)
         for(int i=0;i<(int)p.size();i++){
-            p[i]->preserveElite();
+        //p[i]->preserveElite(m, 0);
+          p[i]->preserveElite(m, (j/(migrateInterval*10))%2);
+          //p[i]->preserveElite(m, 1);
         }
         #ifdef DEBUG
         cout << " ==== End Presevation ====" << endl;
         #endif
 
 
-        
         #ifdef DEBUG
         cout << " ==== Begin Selection ====" << endl;
         #endif
